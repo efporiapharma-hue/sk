@@ -1,6 +1,6 @@
 import { 
   Users, 
-  Calendar, 
+  Calendar as CalendarIcon, 
   Activity, 
   TrendingUp, 
   Clock, 
@@ -10,7 +10,10 @@ import {
   Baby,
   FlaskConical,
   Pill,
-  CreditCard
+  CreditCard,
+  Filter,
+  BarChart3,
+  Calendar
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -24,16 +27,13 @@ import {
   CartesianGrid, 
   Tooltip, 
   ResponsiveContainer,
-  LineChart,
-  Line,
-  AreaChart,
-  Area
+  Cell
 } from 'recharts';
 
 import { Link } from 'react-router-dom';
-import { MOCK_PRESCRIPTIONS, MOCK_PATIENTS, MOCK_USERS } from '@/mockData';
+import { MOCK_PRESCRIPTIONS, MOCK_PATIENTS, MOCK_USERS, MOCK_BILLING, MOCK_PHARMACY_BILLING, MOCK_APPOINTMENTS } from '@/mockData';
 import { FileText, Download, Eye } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { 
   Dialog, 
   DialogContent, 
@@ -41,60 +41,152 @@ import {
   DialogTitle, 
   DialogFooter 
 } from '@/components/ui/dialog';
-
-const data = [
-  { name: 'Mon', opd: 45, ipd: 12 },
-  { name: 'Tue', opd: 52, ipd: 15 },
-  { name: 'Wed', opd: 48, ipd: 10 },
-  { name: 'Thu', opd: 61, ipd: 18 },
-  { name: 'Fri', opd: 55, ipd: 14 },
-  { name: 'Sat', opd: 40, ipd: 8 },
-  { name: 'Sun', opd: 25, ipd: 5 },
-];
-
-const stats = [
-  { name: 'Total Patients', value: '1,284', icon: Users, change: '+12%', trend: 'up', color: 'bg-blue-500' },
-  { name: 'OPD Visits', value: '342', icon: Activity, change: '+5%', trend: 'up', color: 'bg-teal-500' },
-  { name: 'IPD Admissions', value: '86', icon: Calendar, change: '-2%', trend: 'down', color: 'bg-indigo-500' },
-  { name: 'Total Revenue', value: '₹1.42L', icon: TrendingUp, change: '+18%', trend: 'up', color: 'bg-emerald-500' },
-];
-
-const revenueData = [
-  { name: 'Main Billing', value: 84250, color: '#1E6FA8' },
-  { name: 'Pharmacy', value: 32500, color: '#2EC4B6' },
-  { name: 'Lab & Rad', value: 25500, color: '#9333ea' },
-];
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function Dashboard() {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewData, setPreviewData] = useState<{url: string, name: string} | null>(null);
+  const [timeFrame, setTimeFrame] = useState('month');
+  const [dateRange, setDateRange] = useState({ start: '', end: '' });
+
+  // Filter Logic
+  const filteredBilling = useMemo(() => {
+    const now = new Date('2026-04-17'); // Using system date
+    const allBills = [...MOCK_BILLING, ...MOCK_PHARMACY_BILLING];
+    
+    return allBills.filter(bill => {
+      const billDate = new Date(bill.date);
+      
+      if (timeFrame === 'today') {
+        return bill.date === '2026-04-17';
+      }
+      
+      if (timeFrame === 'month') {
+        return billDate.getMonth() === now.getMonth() && billDate.getFullYear() === now.getFullYear();
+      }
+      
+      if (timeFrame === 'quarter') {
+        const currentQuarter = Math.floor(now.getMonth() / 3);
+        const billQuarter = Math.floor(billDate.getMonth() / 3);
+        return currentQuarter === billQuarter && billDate.getFullYear() === now.getFullYear();
+      }
+      
+      if (timeFrame === 'year') {
+        return billDate.getFullYear() === now.getFullYear();
+      }
+
+      if (timeFrame === 'custom' && dateRange.start && dateRange.end) {
+        const start = new Date(dateRange.start);
+        const end = new Date(dateRange.end);
+        return billDate >= start && billDate <= end;
+      }
+      
+      return true; // default/all
+    });
+  }, [timeFrame, dateRange]);
+
+  // Derive Stats
+  const dashboardStats = useMemo(() => {
+    const totalRevenue = filteredBilling.reduce((acc, b) => acc + b.totalAmount, 0);
+    const opdBills = filteredBilling.filter(b => b.items.some(i => i.category === 'OPD')).length;
+    const ipdBills = filteredBilling.filter(b => b.items.some(i => i.category === 'IPD' || i.category === 'OT')).length;
+    
+    const totalPatients = MOCK_PATIENTS.length;
+
+    return [
+      { name: 'Total Patients', value: totalPatients.toLocaleString(), icon: Users, change: '+2', trend: 'up', color: 'bg-blue-500' },
+      { name: 'OPD Transactions', value: opdBills.toString(), icon: Activity, change: opdBills > 0 ? '+5%' : '0%', trend: 'up', color: 'bg-teal-500' },
+      { name: 'IPD/OT Records', value: ipdBills.toString(), icon: CalendarIcon, change: ipdBills > 0 ? '+2%' : '0%', trend: 'up', color: 'bg-indigo-500' },
+      { name: 'Total Revenue', value: `₹${(totalRevenue / 1000).toFixed(1)}K`, icon: TrendingUp, change: '+18%', trend: 'up', color: 'bg-emerald-500' },
+    ];
+  }, [filteredBilling]);
+
+  // Derive Revenue breakdown for chart
+  const revenueBreakdown = useMemo(() => {
+    const categories: Record<string, { value: number, color: string }> = {
+      'Main Billing': { value: 0, color: '#1E6FA8' },
+      'Pharmacy': { value: 0, color: '#2EC4B6' },
+      'Lab & Rad': { value: 0, color: '#9333ea' },
+      'OPD/Consultancy': { value: 0, color: '#f59e0b' }
+    };
+
+    filteredBilling.forEach(bill => {
+      bill.items.forEach(item => {
+        if (item.category === 'Pharmacy') categories['Pharmacy'].value += item.amount;
+        else if (item.category === 'Pathology' || item.category === 'Radiology') categories['Lab & Rad'].value += item.amount;
+        else if (item.category === 'OPD') categories['OPD/Consultancy'].value += item.amount;
+        else categories['Main Billing'].value += item.amount;
+      });
+    });
+
+    return Object.entries(categories).map(([name, data]) => ({
+      name,
+      value: data.value,
+      color: data.color
+    })).filter(d => d.value > 0);
+  }, [filteredBilling]);
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Hospital Overview</h1>
-          <p className="text-muted-foreground">Real-time statistics and clinical insights.</p>
+          <h1 className="text-2xl font-bold tracking-tight text-medical-blue">Global Hospital Analytics</h1>
+          <p className="text-muted-foreground text-sm font-medium">Reporting & Transactional Insights</p>
         </div>
-        <div className="flex gap-2">
-          <Link to="/patient-overview">
-            <Button variant="outline" size="sm" className="gap-2 border-medical-blue text-medical-blue hover:bg-blue-50">
-              <Users className="w-4 h-4" />
-              Patient 360 Overview
-            </Button>
-          </Link>
-          <Link to="/billing">
-            <Button variant="outline" size="sm" className="gap-2">
-              <CreditCard className="w-4 h-4" />
-              Centralized Billing System
-            </Button>
-          </Link>
-          <Button size="sm" className="bg-medical-blue">View All Stats</Button>
+        
+        <div className="flex flex-wrap items-center gap-3 bg-white p-2 rounded-xl shadow-sm border border-slate-100">
+          <Tabs value={timeFrame} onValueChange={setTimeFrame} className="w-auto">
+            <TabsList className="grid grid-cols-4 h-9">
+              <TabsTrigger value="today" className="text-xs">Today</TabsTrigger>
+              <TabsTrigger value="month" className="text-xs">Monthly</TabsTrigger>
+              <TabsTrigger value="quarter" className="text-xs">Quarterly</TabsTrigger>
+              <TabsTrigger value="year" className="text-xs">Yearly</TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          <Select value={timeFrame} onValueChange={setTimeFrame}>
+            <SelectTrigger className="w-[140px] h-9 text-xs">
+              <div className="flex items-center gap-2">
+                <Filter className="w-3 h-3" />
+                <SelectValue placeholder="Other Filters" />
+              </div>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Time</SelectItem>
+              <SelectItem value="custom">Custom Date Range</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {timeFrame === 'custom' && (
+            <div className="flex items-center gap-2">
+              <Input 
+                type="date" 
+                className="h-9 w-32 text-xs" 
+                value={dateRange.start} 
+                onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
+              />
+              <span className="text-slate-400 text-xs">-</span>
+              <Input 
+                type="date" 
+                className="h-9 w-32 text-xs" 
+                value={dateRange.end} 
+                onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
+              />
+            </div>
+          )}
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat) => (
+        {dashboardStats.map((stat) => (
           <Card key={stat.name} className="overflow-hidden border-none shadow-sm">
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-4">
@@ -117,11 +209,19 @@ export default function Dashboard() {
         <Card className="lg:col-span-2 border-none shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle>Revenue Breakdown</CardTitle>
-              <CardDescription>Daily revenue collection across departments.</CardDescription>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <BarChart3 className="w-5 h-5 text-medical-blue" />
+                Revenue Performance
+              </CardTitle>
+              <CardDescription className="text-xs uppercase font-bold tracking-tight">
+                {timeFrame === 'today' ? 'Today' : 
+                 timeFrame === 'month' ? 'Current Month' :
+                 timeFrame === 'quarter' ? 'Current Quarter' :
+                 timeFrame === 'year' ? 'Current Year' : 'Overall'} Summary
+              </CardDescription>
             </div>
             <div className="flex gap-4">
-              {revenueData.map(d => (
+              {revenueBreakdown.map(d => (
                 <div key={d.name} className="flex items-center gap-1.5">
                   <div className="w-2 h-2 rounded-full" style={{ backgroundColor: d.color }}></div>
                   <span className="text-[10px] font-bold text-muted-foreground uppercase">{d.name}</span>
@@ -130,159 +230,122 @@ export default function Dashboard() {
             </div>
           </CardHeader>
           <CardContent className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={revenueData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
-                <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
-                <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} width={100} />
-                <Tooltip 
-                  formatter={(value: number) => [`₹${value.toLocaleString()}`, 'Revenue']}
-                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                />
-                <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={40}>
-                  {revenueData.map((entry, index) => (
-                    <Bar key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            {revenueBreakdown.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={revenueBreakdown} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+                  <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} />
+                  <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} width={120} />
+                  <Tooltip 
+                    formatter={(value: number) => [`₹${value.toLocaleString()}`, 'Revenue']}
+                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                  />
+                  <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={40}>
+                    {revenueBreakdown.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center text-slate-400 gap-2">
+                <BarChart3 className="w-12 h-12 opacity-20" />
+                <p className="text-sm italic">No data records found for this period</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        <Card className="border-none shadow-sm">
-          <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
-            <CardDescription>Latest updates across departments.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-6">
-              {[
-                { time: '10 mins ago', title: 'New Admission', desc: 'Priya Singh - Maternity Ward', icon: Baby, color: 'text-pink-500' },
-                { time: '25 mins ago', title: 'Lab Report Ready', desc: 'MRN-002 - Blood Work', icon: FlaskConical, color: 'text-blue-500' },
-                { time: '1 hour ago', title: 'Critical Alert', desc: 'Bed 201 - Oxygen Low', icon: AlertCircle, color: 'text-rose-500' },
-                { time: '2 hours ago', title: 'Pharmacy Stock', desc: 'Amoxicillin below min level', icon: Pill, color: 'text-amber-500' },
-              ].map((item, i) => (
-                <div key={i} className="flex gap-4">
-                  <div className="relative">
-                    <div className={`w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center ${item.color}`}>
-                      <item.icon className="w-4 h-4" />
-                    </div>
-                    {i !== 3 && <div className="absolute top-8 left-4 w-[1px] h-6 bg-slate-100"></div>}
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold">{item.title}</p>
-                    <p className="text-xs text-muted-foreground">{item.desc}</p>
-                    <p className="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
-                      {item.time}
-                    </p>
-                  </div>
-                </div>
-              ))}
+        <Card className="border-none shadow-sm h-full overflow-hidden">
+          <CardHeader className="bg-slate-50/50">
+            <div className="flex items-center gap-2">
+              <Clock className="w-5 h-5 text-medical-blue" />
+              <CardTitle className="text-lg">Recent Audit Logs</CardTitle>
             </div>
-            <Button variant="ghost" className="w-full mt-6 text-xs text-medical-blue hover:bg-blue-50">View All Activity</Button>
+            <CardDescription className="text-xs">Latest transactions within selected timeframe.</CardDescription>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <div className="space-y-6">
+              {filteredBilling.length === 0 ? (
+                <div className="text-center py-10 space-y-2">
+                  <div className="text-slate-300 flex justify-center"><Filter size={32} /></div>
+                  <p className="text-slate-400 italic text-sm">No recent transactions</p>
+                </div>
+              ) : (
+                filteredBilling.slice(0, 5).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map((bill, i) => (
+                  <div key={bill.id} className="flex gap-4">
+                    <div className="relative">
+                      <div className={`w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-medical-blue`}>
+                        <CreditCard className="w-4 h-4" />
+                      </div>
+                      {i !== Math.min(filteredBilling.length, 5) - 1 && <div className="absolute top-8 left-4 w-[1px] h-6 bg-slate-100"></div>}
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-800">Payment {bill.paymentMode}</p>
+                      <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-tight">Invoice #{bill.id} • ₹{bill.totalAmount}</p>
+                      <p className="text-[9px] text-slate-400 mt-1 flex items-center gap-1">
+                        <CalendarIcon className="w-2.5 h-2.5" />
+                        {bill.date}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      <Card className="border-none shadow-sm">
-        <CardHeader>
-          <CardTitle>Departmental Performance Overview</CardTitle>
-          <CardDescription>Consolidated view of specialty working and patient load.</CardDescription>
+      <Card className="border-none shadow-sm overflow-hidden">
+        <CardHeader className="border-b border-slate-50">
+          <CardTitle className="text-lg">Departmental Activity Report</CardTitle>
+          <CardDescription className="text-xs">Operational summary based on current filters.</CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        <CardContent className="p-0">
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 divide-x divide-slate-50">
             {[
-              { dept: 'OPD', patients: 145, staff: 12, status: 'High Load', color: 'bg-blue-500' },
-              { dept: 'IPD', patients: 32, staff: 18, status: 'Stable', color: 'bg-indigo-500' },
-              { dept: 'Pharmacy', patients: 89, staff: 4, status: 'Efficient', color: 'bg-teal-500' },
-              { dept: 'Lab/Rad', patients: 56, staff: 6, status: 'Pending Reports', color: 'bg-purple-500' },
-              { dept: 'OT', patients: 4, staff: 10, status: 'In-Progress', color: 'bg-rose-500' },
+              { dept: 'OPD', count: filteredBilling.filter(b => b.items.some(i => i.category === 'OPD')).length, label: 'OPD Visits', color: 'bg-blue-500' },
+              { dept: 'IPD', count: filteredBilling.filter(b => b.items.some(i => i.category === 'IPD')).length, label: 'IPD Days', color: 'bg-indigo-500' },
+              { dept: 'Pharmacy', count: filteredBilling.filter(b => b.items.some(i => i.category === 'Pharmacy')).length, label: 'RX Sold', color: 'bg-teal-500' },
+              { dept: 'Lab/Rad', count: filteredBilling.filter(b => b.items.some(i => i.category === 'Pathology' || i.category === 'Radiology')).length, label: 'Test Reports', color: 'bg-purple-500' },
+              { dept: 'OT', count: filteredBilling.filter(b => b.items.some(i => i.category === 'OT')).length, label: 'OT Records', color: 'bg-rose-500' },
             ].map((d) => (
-              <div key={d.dept} className="p-4 rounded-xl border border-slate-100 bg-white shadow-sm">
+              <div key={d.dept} className="p-6 hover:bg-slate-50/50 transition-colors">
                 <div className="flex items-center gap-2 mb-3">
                   <div className={`w-2 h-2 rounded-full ${d.color}`}></div>
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-600">{d.dept}</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{d.dept}</span>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xl font-bold">{d.patients}</p>
-                  <p className="text-[10px] text-muted-foreground font-medium uppercase">Active Patients</p>
-                </div>
-                <Separator className="my-3" />
-                <div className="flex justify-between items-center">
-                  <span className="text-[10px] font-bold text-slate-400">{d.staff} Staff On Duty</span>
-                  <Badge variant="outline" className="text-[8px] h-4 px-1">{d.status}</Badge>
+                  <p className="text-2xl font-bold">{d.count}</p>
+                  <p className="text-[10px] text-muted-foreground font-medium uppercase">{d.label}</p>
                 </div>
               </div>
             ))}
           </div>
         </CardContent>
       </Card>
-      <Card className="border-none shadow-sm">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle>Recent Prescription Uploads</CardTitle>
-            <CardDescription>Prescriptions uploaded by doctors for review.</CardDescription>
-          </div>
-          <Badge variant="outline" className="text-medical-blue border-blue-200">Admin View</Badge>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {MOCK_PRESCRIPTIONS.map((rx) => {
-              const patient = MOCK_PATIENTS.find(p => p.id === rx.patientId);
-              const doctor = MOCK_USERS.find(u => u.id === rx.doctorId);
-              return (
-                <div key={rx.id} className="flex items-center justify-between p-4 rounded-xl border border-slate-100 bg-white shadow-sm hover:border-medical-blue/30 transition-all">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-medical-blue">
-                      <FileText className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-slate-900">{patient?.name || 'Unknown Patient'}</p>
-                      <p className="text-[10px] text-slate-500 uppercase font-medium">By {doctor?.name || 'Doctor'}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    {rx.attachmentUrl ? (
-                      <>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-8 w-8 text-medical-blue hover:bg-blue-50"
-                          onClick={() => {
-                            setPreviewData({ url: rx.attachmentUrl!, name: rx.attachmentName || 'Prescription' });
-                            setIsPreviewOpen(true);
-                          }}
-                        >
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-8 w-8 text-slate-400 hover:bg-slate-50"
-                          onClick={() => {
-                            const link = document.createElement('a');
-                            link.href = rx.attachmentUrl!;
-                            link.download = rx.attachmentName || 'prescription.pdf';
-                            link.click();
-                          }}
-                        >
-                          <Download className="w-4 h-4" />
-                        </Button>
-                      </>
-                    ) : (
-                      <Badge variant="outline" className="text-[10px] text-slate-400">No PDF</Badge>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          <Button variant="outline" className="w-full mt-6 text-xs text-medical-blue hover:bg-blue-50">View All Prescriptions</Button>
-        </CardContent>
-      </Card>
 
-      {/* File Preview Dialog */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Link to="/billing">
+          <Button className="w-full h-24 flex flex-col gap-1 items-center justify-center bg-medical-blue hover:bg-blue-700 shadow-lg rounded-2xl group">
+            <div className="flex items-center gap-3">
+              <CreditCard className="w-6 h-6 group-hover:scale-110 transition-transform" />
+              <span className="text-lg font-bold">Financial Reporting Centre</span>
+            </div>
+            <span className="text-[10px] opacity-80 uppercase font-medium tracking-widest">View Tax & Revenue Audits</span>
+          </Button>
+        </Link>
+        <Link to="/patient-overview">
+          <Button variant="outline" className="w-full h-24 flex flex-col gap-1 items-center justify-center border-medical-blue text-medical-blue hover:bg-blue-50 shadow-sm rounded-2xl group">
+            <div className="flex items-center gap-3">
+              <Users className="w-6 h-6 group-hover:scale-110 transition-transform" />
+              <span className="text-lg font-bold">Clinical 360 Reports</span>
+            </div>
+            <span className="text-[10px] opacity-80 uppercase font-medium tracking-widest">Access Complete Medical History</span>
+          </Button>
+        </Link>
+      </div>
+
       <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
         <DialogContent className="sm:max-w-[800px] h-[90vh] flex flex-col p-0 overflow-hidden">
           <DialogHeader className="p-4 border-b">

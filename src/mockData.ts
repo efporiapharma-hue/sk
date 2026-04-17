@@ -23,7 +23,11 @@ export const MOCK_APPOINTMENTS: Appointment[] = [
 ];
 
 export const MOCK_BILLING: BillingRecord[] = [
-  { id: 'bill1', patientId: 'p1', date: '2024-03-20', items: [{ description: 'Consultation Fee', amount: 500, category: 'OPD' }], totalAmount: 500, paidAmount: 500, status: 'Paid', paymentMode: 'Cash' },
+  { id: 'bill1', patientId: 'p1', date: '2026-04-17', items: [{ description: 'Consultation Fee', amount: 500, category: 'OPD' }], totalAmount: 500, paidAmount: 500, status: 'Paid', paymentMode: 'Cash' },
+  { id: 'bill2', patientId: 'p2', date: '2026-04-16', items: [{ description: 'Room Charges (Semi-Private)', amount: 3000, category: 'IPD' }], totalAmount: 3000, paidAmount: 3000, status: 'Paid', paymentMode: 'UPI' },
+  { id: 'bill3', patientId: 'p1', date: '2026-03-10', items: [{ description: 'Lab Tests', amount: 2500, category: 'Lab' }], totalAmount: 2500, paidAmount: 2500, status: 'Paid', paymentMode: 'Card' },
+  { id: 'bill4', patientId: 'p2', date: '2026-01-15', items: [{ description: 'Surgery Fee', amount: 45000, category: 'IPD' }], totalAmount: 45000, paidAmount: 20000, status: 'Partial', paymentMode: 'Cash' },
+  { id: 'bill5', patientId: 'p1', date: '2025-11-20', items: [{ description: 'Follow-up', amount: 300, category: 'OPD' }], totalAmount: 300, paidAmount: 300, status: 'Paid', paymentMode: 'UPI' },
 ];
 
 export const MOCK_INVENTORY: InventoryItem[] = [
@@ -86,7 +90,7 @@ export const MOCK_PHARMACY_BILLING: BillingRecord[] = [
   { 
     id: 'ph-bill1', 
     patientId: 'p1', 
-    date: '2024-04-10', 
+    date: '2026-04-17', 
     items: [
       { description: 'Paracetamol 500mg (10 tabs)', amount: 120, category: 'Pharmacy' },
       { description: 'Cough Syrup', amount: 85, category: 'Pharmacy' }
@@ -95,6 +99,18 @@ export const MOCK_PHARMACY_BILLING: BillingRecord[] = [
     paidAmount: 205, 
     status: 'Paid', 
     paymentMode: 'UPI' 
+  },
+  { 
+    id: 'ph-bill2', 
+    patientId: 'p2', 
+    date: '2026-04-10', 
+    items: [
+      { description: 'Antibiotics Course', amount: 450, category: 'Pharmacy' }
+    ], 
+    totalAmount: 450, 
+    paidAmount: 450, 
+    status: 'Paid', 
+    paymentMode: 'Cash' 
   },
 ];
 

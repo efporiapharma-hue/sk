@@ -1,0 +1,532 @@
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { 
+  User, 
+  Calendar, 
+  Bed, 
+  History, 
+  FileText, 
+  CreditCard, 
+  Pill, 
+  Shield, 
+  Stethoscope,
+  Search,
+  Share2,
+  Printer,
+  ChevronRight,
+  Clock,
+  CheckCircle2,
+  AlertCircle,
+  ArrowLeft
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { 
+  MOCK_PATIENTS, 
+  MOCK_APPOINTMENTS, 
+  MOCK_BILLING, 
+  MOCK_BEDS,
+  MOCK_USERS,
+  MOCK_PRESCRIPTIONS
+} from '@/mockData';
+import { formatCurrency, formatDate } from '@/lib/utils';
+import { toast } from 'sonner';
+import { Download } from 'lucide-react';
+
+// Local mock for insurance claims if not globally available
+const MOCK_CLAIMS = [
+  { id: 'CLM-001', patientId: 'p1', amount: 45000, status: 'Approved', company: 'Star Health' },
+  { id: 'CLM-002', patientId: 'p2', amount: 120000, status: 'Pending', company: 'HDFC ERGO' },
+];
+
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogFooter 
+} from '@/components/ui/dialog';
+import { Eye } from 'lucide-react';
+
+export default function PatientOverview() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const patientIdFromUrl = searchParams.get('id');
+  
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedPatient, setSelectedPatient] = useState<any>(null);
+  const [filteredPatients, setFilteredPatients] = useState(MOCK_PATIENTS);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [previewData, setPreviewData] = useState<{url: string, name: string} | null>(null);
+
+  useEffect(() => {
+    if (patientIdFromUrl) {
+      const patient = MOCK_PATIENTS.find(p => p.id === patientIdFromUrl);
+      if (patient) {
+        setSelectedPatient(patient);
+      }
+    } else {
+      setSelectedPatient(null);
+    }
+  }, [patientIdFromUrl]);
+
+  useEffect(() => {
+    if (searchQuery.trim() === '') {
+      setFilteredPatients(MOCK_PATIENTS);
+    } else {
+      const query = searchQuery.toLowerCase();
+      setFilteredPatients(
+        MOCK_PATIENTS.filter(p => 
+          p.name.toLowerCase().includes(query) || 
+          p.mrn.toLowerCase().includes(query) ||
+          p.phone?.includes(query)
+        )
+      );
+    }
+  }, [searchQuery]);
+
+  const handleShareWhatsApp = () => {
+    if (!selectedPatient) return;
+    
+    const doctor = MOCK_USERS.find(u => u.id === selectedPatient.attendingDoctorId);
+    const shareUrl = `${window.location.origin}/patient-overview?id=${selectedPatient.id}`;
+    const patientData = `
+*Patient Overview: ${selectedPatient.name}*
+*MRN:* ${selectedPatient.mrn}
+*Age/Gender:* ${selectedPatient.age}Y / ${selectedPatient.gender}
+*Attending Doctor:* ${doctor?.name || 'Dr. Rajesh Sharma'}
+*Status:* ${selectedPatient.status}
+*Current Dues:* ${formatCurrency(calculateDues(selectedPatient.id))}
+*Insurance Status:* ${MOCK_CLAIMS.find(c => c.patientId === selectedPatient.id)?.status || 'N/A'}
+
+View full details at: ${shareUrl}
+    `.trim();
+
+    const encodedText = encodeURIComponent(patientData);
+    window.open(`https://wa.me/?text=${encodedText}`, '_blank');
+    toast.success('Sharing to WhatsApp...');
+  };
+
+  const calculateDues = (patientId: string) => {
+    const patientBills = MOCK_BILLING.filter(b => b.patientId === patientId);
+    const total = patientBills.reduce((acc, b) => acc + b.totalAmount, 0);
+    const paid = patientBills.reduce((acc, b) => acc + (b.paidAmount || 0), 0);
+    return total - paid;
+  };
+
+  if (!selectedPatient) {
+    return (
+      <div className="p-6 space-y-6">
+        <div className="flex flex-col gap-2">
+          <h1 className="text-2xl font-bold tracking-tight">Patient 360 Overview</h1>
+          <p className="text-muted-foreground text-sm">Search and select a patient to view their complete medical and financial history.</p>
+        </div>
+
+        <div className="relative max-w-2xl">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+          <Input 
+            placeholder="Search by Patient Name, MRN, or Phone Number..." 
+            className="pl-10 h-12 text-lg shadow-sm border-slate-200"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredPatients.map((patient) => (
+            <Card 
+              key={patient.id} 
+              className="hover:ring-2 hover:ring-medical-blue/20 transition-all cursor-pointer border-none shadow-sm"
+              onClick={() => setSearchParams({ id: patient.id })}
+            >
+              <CardContent className="p-4 flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-medical-blue font-bold text-lg">
+                  {patient.name.charAt(0)}
+                </div>
+                <div className="flex-1 overflow-hidden">
+                  <p className="font-bold text-slate-800 truncate">{patient.name}</p>
+                  <p className="text-xs text-slate-500 font-medium">{patient.mrn}</p>
+                </div>
+                <ChevronRight className="w-5 h-5 text-slate-300" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const patientAppointments = MOCK_APPOINTMENTS.filter(a => a.patientId === selectedPatient.id);
+  const patientBills = MOCK_BILLING.filter(b => b.patientId === selectedPatient.id);
+  const patientClaims = MOCK_CLAIMS.filter(c => c.patientId === selectedPatient.id);
+  const currentBed = MOCK_BEDS.find(b => b.patientId === selectedPatient.id);
+  const dues = calculateDues(selectedPatient.id);
+
+  return (
+    <div className="p-6 space-y-6 bg-slate-50/50 min-h-screen">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => setSearchParams({})}>
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-800">{selectedPatient.name}</h1>
+            <p className="text-muted-foreground text-sm font-medium uppercase tracking-wider">{selectedPatient.mrn} • {selectedPatient.age}Y / {selectedPatient.gender}</p>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" className="gap-2" onClick={() => window.print()}>
+            <Printer className="w-4 h-4" />
+            Print Report
+          </Button>
+          <Button className="bg-[#25D366] hover:bg-[#128C7E] text-white gap-2" onClick={handleShareWhatsApp}>
+            <Share2 className="w-4 h-4" />
+            Share on WhatsApp
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column: Profile & Quick Stats */}
+        <div className="space-y-6">
+          <Card className="border-none shadow-sm overflow-hidden">
+            <CardHeader className="bg-medical-blue text-white pb-8">
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center text-white font-bold text-2xl border border-white/30">
+                  {selectedPatient.name.charAt(0)}
+                </div>
+                <div>
+                  <CardTitle className="text-white">Patient Profile</CardTitle>
+                  <Badge className="bg-white/20 text-white border-none mt-1">{selectedPatient.status}</Badge>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6 -mt-4 bg-white rounded-t-3xl space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">Phone</p>
+                  <p className="text-sm font-medium">{selectedPatient.phone}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">Blood Group</p>
+                  <p className="text-sm font-medium">{selectedPatient.bloodGroup || 'N/A'}</p>
+                </div>
+                <div className="space-y-1 col-span-2">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">Address</p>
+                  <p className="text-sm font-medium">{selectedPatient.address}</p>
+                </div>
+              </div>
+              <Separator />
+              <div className="space-y-3">
+                <p className="text-xs font-bold text-slate-800 uppercase tracking-wider">Attending Doctors</p>
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
+                    <Stethoscope className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold">
+                      {MOCK_USERS.find(u => u.id === selectedPatient.attendingDoctorId)?.name || 'Dr. Rajesh Sharma'}
+                    </p>
+                    <p className="text-[10px] text-slate-500">
+                      {MOCK_USERS.find(u => u.id === selectedPatient.attendingDoctorId)?.department || 'General Medicine'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-none shadow-sm bg-rose-50 border-l-4 border-rose-500">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-bold text-rose-600 uppercase tracking-wider mb-1">Outstanding Dues</p>
+                <h3 className="text-2xl font-bold text-rose-700">{formatCurrency(dues)}</h3>
+              </div>
+              <div className="p-3 rounded-xl bg-rose-100 text-rose-600">
+                <CreditCard className="w-6 h-6" />
+              </div>
+            </CardContent>
+          </Card>
+
+          {currentBed && (
+            <Card className="border-none shadow-sm bg-blue-50 border-l-4 border-blue-500">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-1">Current Admission</p>
+                  <h3 className="text-xl font-bold text-blue-700">Bed {currentBed.number}</h3>
+                  <p className="text-[10px] text-blue-500 font-medium">{currentBed.ward}</p>
+                </div>
+                <div className="p-3 rounded-xl bg-blue-100 text-blue-600">
+                  <Bed className="w-6 h-6" />
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        {/* Middle & Right Column: Detailed History */}
+        <div className="lg:col-span-2 space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Appointments */}
+            <Card className="border-none shadow-sm">
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-medical-blue" />
+                  <CardTitle className="text-lg">Appointments</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="h-[250px] overflow-y-auto custom-scrollbar">
+                  <div className="p-4 space-y-3">
+                    {patientAppointments.length === 0 ? (
+                      <p className="text-xs text-slate-400 text-center py-8 italic">No appointment history</p>
+                    ) : (
+                      patientAppointments.map(app => (
+                        <div key={app.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100">
+                          <div>
+                            <p className="text-sm font-bold">{formatDate(app.date)}</p>
+                            <p className="text-[10px] text-slate-500">{app.time} • {app.type}</p>
+                          </div>
+                          <Badge variant="outline" className="text-[9px] font-bold uppercase">{app.status}</Badge>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Medical History / Notes */}
+            <Card className="border-none shadow-sm">
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-2">
+                  <History className="w-5 h-5 text-medical-blue" />
+                  <CardTitle className="text-lg">Medical History</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="h-[250px] overflow-y-auto custom-scrollbar">
+                  <div className="p-4 space-y-4">
+                    <div className="relative pl-6 border-l-2 border-slate-100 space-y-6">
+                      <div className="relative">
+                        <div className="absolute -left-[31px] top-0 w-4 h-4 rounded-full bg-medical-blue border-4 border-white shadow-sm"></div>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">12-Apr-2024</p>
+                        <p className="text-sm font-bold">Acute Bronchitis</p>
+                        <p className="text-xs text-slate-600 mt-1">Patient admitted with difficulty breathing. Started on nebulization.</p>
+                      </div>
+                      <div className="relative">
+                        <div className="absolute -left-[31px] top-0 w-4 h-4 rounded-full bg-slate-300 border-4 border-white shadow-sm"></div>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">20-Mar-2024</p>
+                        <p className="text-sm font-bold">Routine Checkup</p>
+                        <p className="text-xs text-slate-600 mt-1">General consultation. BP stable. Advised lifestyle changes.</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Prescriptions */}
+            <Card className="border-none shadow-sm">
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-2">
+                  <Pill className="w-5 h-5 text-medical-blue" />
+                  <CardTitle className="text-lg">Recent Prescriptions</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="h-[250px] overflow-y-auto custom-scrollbar">
+                  <div className="p-4 space-y-3">
+                    {MOCK_PRESCRIPTIONS.filter(rx => rx.patientId === selectedPatient.id).length === 0 ? (
+                      <p className="text-xs text-slate-400 text-center py-8 italic">No prescription history</p>
+                    ) : (
+                      MOCK_PRESCRIPTIONS.filter(rx => rx.patientId === selectedPatient.id).map(rx => (
+                        <div key={rx.id} className="p-3 rounded-xl bg-blue-50/50 border border-blue-100">
+                          <div className="flex justify-between items-start mb-2">
+                            <p className="text-[10px] font-bold text-blue-600 uppercase">
+                              {MOCK_USERS.find(u => u.id === rx.doctorId)?.name || 'Doctor'}
+                            </p>
+                            <p className="text-[10px] text-slate-400">{formatDate(rx.date)}</p>
+                          </div>
+                          <div className="space-y-1">
+                            {rx.medicines.map((m, i) => (
+                              <p key={i} className="text-xs font-bold">{m.name} ({m.dosage}) - {m.frequency}</p>
+                            ))}
+                          </div>
+                          {rx.attachmentUrl && (
+                            <div className="mt-3 pt-2 border-t border-blue-100 flex items-center justify-between">
+                              <span className="text-[10px] text-blue-600 font-medium truncate max-w-[100px]">
+                                {rx.attachmentName || 'Prescription PDF'}
+                              </span>
+                              <div className="flex gap-1">
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="h-6 text-medical-blue hover:bg-blue-100 px-2"
+                                  onClick={() => {
+                                    setPreviewData({ url: rx.attachmentUrl!, name: rx.attachmentName || 'Prescription' });
+                                    setIsPreviewOpen(true);
+                                  }}
+                                >
+                                  <Eye className="w-3 h-3 mr-1" />
+                                  View
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="h-6 text-slate-500 hover:bg-slate-100 px-2"
+                                  onClick={() => {
+                                    const link = document.createElement('a');
+                                    link.href = rx.attachmentUrl!;
+                                    link.download = rx.attachmentName || 'prescription.pdf';
+                                    link.click();
+                                  }}
+                                >
+                                  <Download className="w-3 h-3 mr-1" />
+                                  Download
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Insurance Claims */}
+            <Card className="border-none shadow-sm">
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-2">
+                  <Shield className="w-5 h-5 text-medical-blue" />
+                  <CardTitle className="text-lg">Insurance Claims</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="h-[250px] overflow-y-auto custom-scrollbar">
+                  <div className="p-4 space-y-3">
+                    {patientClaims.length === 0 ? (
+                      <p className="text-xs text-slate-400 text-center py-8 italic">No insurance claims found</p>
+                    ) : (
+                      patientClaims.map(claim => (
+                        <div key={claim.id} className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <p className="text-sm font-bold">{claim.company}</p>
+                              <p className="text-[10px] text-slate-500">{claim.id}</p>
+                            </div>
+                            <Badge className={`${claim.status === 'Approved' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'} border-none text-[9px] uppercase`}>
+                              {claim.status}
+                            </Badge>
+                          </div>
+                          <p className="text-sm font-bold text-medical-blue mt-2">{formatCurrency(claim.amount)}</p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Billing & Payments */}
+            <Card className="border-none shadow-sm md:col-span-2">
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-medical-blue" />
+                  <CardTitle className="text-lg">Billing & Payment Status</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="p-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Total Billed</p>
+                      <p className="text-lg font-bold">{formatCurrency(patientBills.reduce((acc, b) => acc + b.totalAmount, 0))}</p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-100">
+                      <p className="text-[10px] font-bold text-emerald-600 uppercase mb-1">Total Paid</p>
+                      <p className="text-lg font-bold text-emerald-700">{formatCurrency(patientBills.reduce((acc, b) => acc + (b.paidAmount || 0), 0))}</p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-rose-50 border border-rose-100">
+                      <p className="text-[10px] font-bold text-rose-600 uppercase mb-1">Total Dues</p>
+                      <p className="text-lg font-bold text-rose-700">{formatCurrency(dues)}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    {patientBills.map(bill => (
+                      <div key={bill.id} className="flex items-center justify-between p-3 rounded-xl bg-white border border-slate-100 shadow-sm">
+                        <div className="flex items-center gap-3">
+                          <div className={`p-2 rounded-lg ${bill.status === 'Paid' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
+                            {bill.status === 'Paid' ? <CheckCircle2 className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold">Invoice #{bill.id.toUpperCase()}</p>
+                            <p className="text-[10px] text-slate-500">{formatDate(bill.date)} • {bill.paymentMode || 'N/A'}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-bold">{formatCurrency(bill.totalAmount)}</p>
+                          <Badge variant="outline" className="text-[9px] uppercase">{bill.status}</Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+
+      {/* File Preview Dialog */}
+      <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
+        <DialogContent className="sm:max-w-[800px] h-[90vh] flex flex-col p-0 overflow-hidden">
+          <DialogHeader className="p-4 border-b">
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="w-5 h-5 text-medical-blue" />
+              {previewData?.name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 bg-slate-100 relative overflow-hidden">
+            {previewData?.url.startsWith('data:application/pdf') ? (
+              <iframe 
+                src={previewData.url} 
+                className="w-full h-full border-none"
+                title="PDF Preview"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center p-4">
+                <img 
+                  src={previewData?.url} 
+                  alt="Prescription Preview" 
+                  className="max-w-full max-h-full object-contain shadow-lg rounded-lg"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+            )}
+          </div>
+          <DialogFooter className="p-4 border-t bg-white">
+            <Button variant="outline" onClick={() => setIsPreviewOpen(false)}>Close Preview</Button>
+            <Button className="bg-medical-blue" onClick={() => {
+              if (previewData) {
+                const link = document.createElement('a');
+                link.href = previewData.url;
+                link.download = previewData.name;
+                link.click();
+              }
+            }}>
+              <Download className="w-4 h-4 mr-2" />
+              Download File
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

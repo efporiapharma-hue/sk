@@ -31,7 +31,8 @@ import {
   MOCK_BILLING, 
   MOCK_BEDS,
   MOCK_USERS,
-  MOCK_PRESCRIPTIONS
+  MOCK_PRESCRIPTIONS,
+  MOCK_PATIENT_VITALS
 } from '@/mockData';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -110,6 +111,136 @@ View full details at: ${shareUrl}
     toast.success('Sharing to WhatsApp...');
   };
 
+  const handlePrintBlankPrescription = () => {
+    if (!selectedPatient) return;
+
+    const vitals = MOCK_PATIENT_VITALS.find(v => v.patientId === selectedPatient.id);
+    const doctor = MOCK_USERS.find(u => u.id === selectedPatient.attendingDoctorId);
+
+    const printWindow = window.open('', '_blank', 'width=800,height=1000');
+    if (!printWindow) {
+      toast.error('Please allow popups to print prescription');
+      return;
+    }
+
+    const prescriptionHtml = `
+      <html>
+        <head>
+          <title>Prescription - ${selectedPatient.name}</title>
+          <style>
+            @page { margin: 10mm; }
+            body { 
+              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+              padding: 20px;
+              color: #333;
+            }
+            .header { text-align: center; border-bottom: 2px solid #2563eb; padding-bottom: 10px; margin-bottom: 20px; }
+            .hosp-name { font-size: 24px; font-weight: bold; color: #2563eb; }
+            .hosp-sub { font-size: 14px; color: #666; margin-top: 5px; }
+            
+            .patient-box { display: grid; grid-template-cols: 1fr 1fr; gap: 10px; padding: 10px; background: #f8fafc; border-radius: 8px; margin-bottom: 20px; }
+            .info-item { font-size: 13px; }
+            .info-label { font-weight: bold; color: #64748b; margin-right: 5px; }
+            
+            .vitals-bar { display: flex; justify-content: space-between; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 30px; background: #fff; }
+            .vital-item { text-align: center; flex: 1; border-right: 1px solid #e2e8f0; }
+            .vital-item:last-child { border-right: none; }
+            .vital-val { font-weight: bold; font-size: 16px; margin-top: 2px; }
+            .vital-label { font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: bold; }
+            
+            .rx-symbol { font-size: 40px; font-weight: bold; color: #2563eb; margin: 20px 0; font-family: 'Times New Roman', serif; }
+            
+            .blank-lines { margin-top: 40px; }
+            .line-group { margin-bottom: 300px; }
+            .section-title { font-weight: bold; color: #2563eb; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; margin-bottom: 15px; }
+            
+            .footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: flex-end; }
+            .doc-sig { text-align: center; }
+            .sig-line { width: 200px; border-top: 1px solid #000; margin-top: 60px; }
+            
+            @media print {
+              .no-print { display: none; }
+              body { padding: 0; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="hosp-name">GLOBAL HOSPITAL</div>
+            <div class="hosp-sub">& MATERNITY CENTER</div>
+            <div style="font-size: 12px; margin-top: 5px;">Plot 12, Medical Square, City Center • Tel: +91 1234567890</div>
+          </div>
+
+          <div class="patient-box">
+            <div class="info-item"><span class="info-label">Patient:</span> ${selectedPatient.name}</div>
+            <div class="info-item"><span class="info-label">MRN:</span> ${selectedPatient.mrn}</div>
+            <div class="info-item"><span class="info-label">Age/Gender:</span> ${selectedPatient.age}Y / ${selectedPatient.gender}</div>
+            <div class="info-item"><span class="info-label">Date:</span> ${new Date().toLocaleDateString('en-IN')}</div>
+            <div class="info-item"><span class="info-label">Doctor:</span> ${doctor?.name || 'Dr. Consultant'}</div>
+            <div class="info-item"><span class="info-label">Dept:</span> ${doctor?.department || 'OPD'}</div>
+          </div>
+
+          <div class="vitals-bar">
+            <div class="vital-item">
+              <div class="vital-label">BP</div>
+              <div class="vital-val">${vitals?.bp || '___/___'}</div>
+            </div>
+            <div class="vital-item">
+              <div class="vital-label">Pulse</div>
+              <div class="vital-val">${vitals?.pulse || '___'} bpm</div>
+            </div>
+            <div class="vital-item">
+              <div class="vital-label">Temp</div>
+              <div class="vital-val">${vitals?.temp || '___ °F'}</div>
+            </div>
+            <div class="vital-item">
+              <div class="vital-label">SpO2</div>
+              <div class="vital-val">${vitals?.spo2 || '___'}%</div>
+            </div>
+            <div class="vital-item">
+              <div class="vital-label">Weight</div>
+              <div class="vital-val">___ kg</div>
+            </div>
+          </div>
+
+          <div class="rx-symbol">Rx</div>
+
+          <div class="blank-lines">
+            <div class="section-title">Clinical Notes / Diagnosis</div>
+            <div style="height: 100px;"></div>
+            
+            <div class="section-title">Medicines & Advice</div>
+            <div style="height: 400px; border: 1px dashed #e2e8f0; border-radius: 8px; position: relative;">
+               <div style="position: absolute; top: 10px; left: 10px; color: #cbd5e1; font-size: 12px;">Doctor's Signature Space</div>
+            </div>
+          </div>
+
+          <div class="footer">
+            <div style="font-size: 10px; color: #94a3b8;">
+              * Disclaimer: This is a system generated prescription template.<br>
+              Valid only when signed and stamped by the attending doctor.
+            </div>
+            <div class="doc-sig">
+              <div class="sig-line"></div>
+              <div style="font-weight: bold; margin-top: 5px;">Doctor's Signature</div>
+              <div style="font-size: 10px;">${doctor?.name || 'Dr. Consultant'}</div>
+            </div>
+          </div>
+
+          <script>
+            window.onload = () => {
+              window.print();
+              setTimeout(() => window.close(), 500);
+            };
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(prescriptionHtml);
+    printWindow.document.close();
+  };
+
   const calculateDues = (patientId: string) => {
     const patientBills = MOCK_BILLING.filter(b => b.patientId === patientId);
     const total = patientBills.reduce((acc, b) => acc + b.totalAmount, 0);
@@ -178,6 +309,10 @@ View full details at: ${shareUrl}
           </div>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" className="gap-2" onClick={handlePrintBlankPrescription}>
+            <FileText className="w-4 h-4" />
+            Blank Prescription
+          </Button>
           <Button variant="outline" className="gap-2" onClick={() => window.print()}>
             <Printer className="w-4 h-4" />
             Print Report

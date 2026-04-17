@@ -151,7 +151,7 @@ export default function PharmacyPOS() {
         </head>
         <body>
           <div class="header text-center">
-            <div class="bold" style="font-size: 16px;">DC GLOBAL HOSPITAL</div>
+            <div class="bold" style="font-size: 16px;">GLOBAL HOSPITAL</div>
             <div>Pharmacy Department</div>
             <div>Tel: +91 1234567890</div>
           </div>
@@ -196,7 +196,7 @@ export default function PharmacyPOS() {
           <div class="footer text-center">
             <div>Thank You! Get Well Soon.</div>
             <div>Medicines once sold cannot be returned.</div>
-            <div style="margin-top: 5px;">Powered by DC Global HMS</div>
+            <div style="margin-top: 5px;">Powered by Global Hospital HMS</div>
           </div>
           
           <script>

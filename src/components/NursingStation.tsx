@@ -157,7 +157,7 @@ export default function NursingStation() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {patients.filter(p => p.status !== 'Active').map((patient, idx) => {
                 const patientVitals = vitals.find(v => v.patientId === patient.id);
-                const riskStatus = idx === 0 ? 'High Risk' : idx === 1 ? 'Moderate Risk' : 'Stable';
+                const riskStatus = patient.status || 'Stable';
                 
                 return (
                   <Card key={patient.id} className={`border-2 transition-all duration-500 ${
@@ -178,7 +178,7 @@ export default function NursingStation() {
                         </div>
                         <div className="flex flex-col items-end gap-2">
                           <div className={`w-4 h-4 rounded-full ${getStatusColor(riskStatus)} ${getStatusAnimation(riskStatus)}`}></div>
-                          <Select onValueChange={(v: string) => handleUpdateCondition(patient.id, v)}>
+                          <Select value={riskStatus} onValueChange={(v: string) => handleUpdateCondition(patient.id, v)}>
                             <SelectTrigger className="h-7 text-[10px] w-24">
                               <SelectValue placeholder="Update Status" />
                             </SelectTrigger>

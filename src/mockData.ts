@@ -8,7 +8,7 @@ export const MOCK_USERS: User[] = [
 
 export const MOCK_PATIENTS: Patient[] = [
   { id: 'p1', mrn: 'MRN-001', name: 'Amit Patel', age: 28, gender: 'Male', phone: '9876543210', address: 'B-42, Sector 15, Noida', bloodGroup: 'A+', status: 'Active', lastVisit: '2024-03-20', fatherName: 'Rajesh Patel', guardianName: 'Rajesh Patel', dob: '1996-05-15', attendingDoctorId: 'u1' },
-  { id: 'p2', mrn: 'MRN-002', name: 'Priya Singh', age: 45, gender: 'Female', phone: '9123456789', address: 'Flat 201, Green View, Mumbai', bloodGroup: 'O-', status: 'Admitted', lastVisit: '2024-03-25', husbandName: 'Vikram Singh', guardianName: 'Vikram Singh', dob: '1979-11-10', attendingDoctorId: 'u2' },
+  { id: 'p2', mrn: 'MRN-002', name: 'Priya Singh', age: 45, gender: 'Female', phone: '9123456789', address: 'Flat 201, Green View, Mumbai', bloodGroup: 'O-', status: 'High Risk', lastVisit: '2024-03-25', husbandName: 'Vikram Singh', guardianName: 'Vikram Singh', dob: '1979-11-10', attendingDoctorId: 'u2' },
 ];
 
 export const MOCK_BEDS: Bed[] = [
@@ -124,4 +124,13 @@ export const MOCK_OT_RATES = [
   { type: 'Major', rate: 15000 },
   { type: 'Cardiac', rate: 45000 },
   { type: 'Neuro', rate: 55000 },
+];
+
+export const MOCK_MATERIAL_RATES = [
+  { name: 'Surgical Gloves', price: 150, category: 'Disposable' },
+  { name: 'Syringes (Pack of 10)', price: 100, category: 'Disposable' },
+  { name: 'IV Fluid Set', price: 450, category: 'Disposable' },
+  { name: 'Cotton / Bandage Kit', price: 200, category: 'Material' },
+  { name: 'Disinfectant Solution', price: 350, category: 'Material' },
+  { name: 'Catheter Set', price: 850, category: 'Disposable' },
 ];

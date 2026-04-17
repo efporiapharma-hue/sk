@@ -85,7 +85,7 @@ function SidebarContent({ onLogout }: { onLogout: () => void }) {
           G
         </div>
         <div>
-          <h1 className="text-sm font-bold leading-none">GLOBAL HOSPITAL</h1>
+          <h1 className="text-sm font-bold leading-none text-medical-blue">GLOBAL HOSPITAL</h1>
           <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-medium">Maternity Center</p>
         </div>
       </div>
